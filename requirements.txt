@@ -1,0 +1,10 @@
+streamlit==1.32.0
+torch
+torchvision
+opencv-python
+matplotlib
+seaborn
+scikit-learn
+tqdm
+Pillow
+numpy

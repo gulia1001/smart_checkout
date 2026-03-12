@@ -1,0 +1,16 @@
+# Игнорируем датасеты (слишком тяжелые)
+dataset/
+!dataset/.gitkeep
+
+# Игнорируем веса моделей
+models/*.pth
+models/*.h5
+
+# Игнорируем системные файлы Python
+__pycache__/
+*.pyc
+.env
+gsenv/
+venv/
+env/
+.DS_Store
