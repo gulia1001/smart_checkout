@@ -23,6 +23,15 @@ WINDOW_SIZE = (224, 224)
 # Streamlit Page Config
 st.set_page_config(page_title="Smart Checkout AI", page_icon="🛒", layout="wide")
 
+# Список моделей синхронизирован с вашим скриптом обучения
+SUPPORTED_MODELS = [
+    "AlexNet", 
+    "VGG16", 
+    "ResNet50", 
+    "GoogLeNet", 
+    "MobileNetV2"
+]
+
 # --- 2. CACHED MODEL LOADING ---
 @st.cache_resource
 def load_model(model_name, model_path):
@@ -32,23 +41,43 @@ def load_model(model_name, model_path):
         return None, None, f"Error: Weights file not found at {model_path}"
 
     try:
-        if model_name == "MobileNetV2":
-            model = models.mobilenet_v2(weights=None)
-            num_ftrs = model.classifier[1].in_features
-            model.classifier[1] = nn.Linear(num_ftrs, len(CLASSES))
+        # Здесь мы ставим weights=None, потому что загружаем ваши собственные веса ниже
+        if model_name == "AlexNet":
+            model = models.alexnet(weights=None)
+            num_ftrs = model.classifier[6].in_features
+            model.classifier[6] = nn.Linear(num_ftrs, len(CLASSES))
+
+        elif model_name == "VGG16":
+            model = models.vgg16(weights=None)
+            num_ftrs = model.classifier[6].in_features
+            model.classifier[6] = nn.Linear(num_ftrs, len(CLASSES))
+
         elif model_name == "ResNet50":
             model = models.resnet50(weights=None)
             num_ftrs = model.fc.in_features
             model.fc = nn.Linear(num_ftrs, len(CLASSES))
+
+        elif model_name == "GoogLeNet":
+            # Для GoogLeNet при инференсе aux_logits=False
+            model = models.googlenet(weights=None, aux_logits=False)
+            num_ftrs = model.fc.in_features
+            model.fc = nn.Linear(num_ftrs, len(CLASSES))
+
+        elif model_name == "MobileNetV2":
+            model = models.mobilenet_v2(weights=None)
+            num_ftrs = model.classifier[1].in_features
+            model.classifier[1] = nn.Linear(num_ftrs, len(CLASSES))
+
         else:
             return None, None, "Model architecture not supported in this demo yet."
 
+        # Загружаем сохраненные веса
         model.load_state_dict(torch.load(model_path, map_location=device))
         model.to(device)
-        model.eval()
+        model.eval() # Обязательно переводим в режим оценки
         return model, device, "Success"
     except Exception as e:
-        return None, None, str(e)
+        return None, None, f"Model Loading Error: {str(e)}"
 
 # --- 3. UI LAYOUT ---
 st.title("🛒 Smart Checkout: AI Cashier")
@@ -56,21 +85,21 @@ st.markdown("Upload a picture of grocery items, and the AI will detect them, dra
 
 # Sidebar for controls
 st.sidebar.header("⚙️ Settings")
-selected_model = st.sidebar.selectbox("Choose AI Model", ["MobileNetV2", "ResNet50"])
+selected_model = st.sidebar.selectbox("Choose AI Model", SUPPORTED_MODELS)
 
-# ⚠️ CORRECTED PATH DIRECTION HERE ⚠️
-# This forces the script to look for the "models" folder relative to where app.py is located
+# Надежный поиск папки с моделями
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 weights_path = os.path.join(BASE_DIR, "models", f"{selected_model}_weights1.pth")
 
-conf_threshold = st.sidebar.slider("Confidence Threshold", 0.50, 0.99, 0.85, 0.01)
-nms_threshold = st.sidebar.slider("NMS Threshold (Overlap)", 0.10, 0.90, 0.30, 0.05)
-step_size = st.sidebar.slider("Sliding Window Step Size", 32, 128, 64, 16)
+conf_threshold = st.sidebar.slider("Confidence Threshold", 0.50, 0.99, 0.66, 0.01)
+nms_threshold = st.sidebar.slider("NMS Threshold (Overlap)", 0.10, 0.90, 0.10, 0.05)
+step_size = st.sidebar.slider("Sliding Window Step Size", 32, 128, 128, 16)
 
 # Load the model
 model, device, status = load_model(selected_model, weights_path)
 if model is None:
     st.sidebar.error(status)
+    st.sidebar.warning(f"Убедитесь, что вы обучили {selected_model} и сохранили файл как {selected_model}_weights1.pth в папке models!")
 else:
     st.sidebar.success(f"{selected_model} loaded on {device}!")
 
@@ -144,7 +173,7 @@ if uploaded_file is not None and model is not None:
                     price = PRICES.get(class_name, 0.0)
 
                     total_price += price
-                    receipt_items.append({"Item": class_name.capitalize(), "Confidence": f"{score:.2f}", "Price": f"{price:.2f}tg"})
+                    receipt_items.append({"Item": class_name.capitalize(), "Confidence": f"{score:.2f}", "Price": f"{price:.2f} tg"})
 
                     # Draw box
                     draw.rectangle([x_min, y_min, x_max, y_max], outline="lime", width=4)

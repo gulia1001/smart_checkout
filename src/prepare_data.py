@@ -1,16 +1,13 @@
 import os
 from PIL import Image
-from tqdm import tqdm  # Обычный tqdm для локального терминала
+from tqdm import tqdm  
 
-# --- НАСТРОЙКИ ПУТЕЙ (относительно папки src) ---
-# Предполагается, что скрипт лежит в папке src/, а данные в dataset/
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE_DIR = os.path.join(BASE_DIR, 'dataset', 'raw')
 TARGET_DIR = os.path.join(BASE_DIR, 'dataset', 'processed')
 
 TARGET_SIZE = (224, 224)
 
-# Классы, которые нужно обрезать сильнее (маленькие объекты)
 SMALL_OBJECTS = ['candybars', 'chocolate']
 
 def main():
@@ -33,10 +30,8 @@ def main():
 
         images = [f for f in os.listdir(source_class_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
         
-        # Определяем, насколько сильно обрезать края (оставляем X% в центре)
         crop_factor = 0.45 if cls_name in SMALL_OBJECTS else 0.65
 
-        # tqdm без leave=False, чтобы логи в терминале выглядели красиво
         for img_name in tqdm(images, desc=f"Обработка: {cls_name}"):
             source_path = os.path.join(source_class_dir, img_name)
             target_path = os.path.join(target_class_dir, img_name)
@@ -45,23 +40,18 @@ def main():
                 with Image.open(source_path) as img:
                     img = img.convert('RGB')
 
-                    # --- УМНАЯ ОБРЕЗКА ЦЕНТРА ---
                     width, height = img.size
 
-                    # Вычисляем новые размеры
                     new_width = width * crop_factor
                     new_height = height * crop_factor
 
-                    # Вычисляем координаты для вырезания центрального прямоугольника
                     left = (width - new_width) / 2
                     top = (height - new_height) / 2
                     right = (width + new_width) / 2
                     bottom = (height + new_height) / 2
 
-                    # Вырезаем объект
                     img = img.crop((left, top, right, bottom))
 
-                    # --- СЖАТИЕ ---
                     img = img.resize(TARGET_SIZE, Image.Resampling.LANCZOS)
                     img.save(target_path, format='JPEG', quality=85)
                     total_images += 1

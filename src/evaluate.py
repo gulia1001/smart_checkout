@@ -6,7 +6,8 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
-
+import random
+from torch.utils.data import Subset
 # --- 1. НАСТРОЙКИ ---
 # Получаем пути относительно папки src/
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -62,10 +63,28 @@ def main():
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
-    test_dataset = datasets.ImageFolder(TEST_DATA_DIR, transform=transform)
+
+    # 1. Загружаем весь датасет (пока без DataLoader)
+    full_dataset = datasets.ImageFolder(TEST_DATA_DIR, transform=transform)
+
+    # 2. Группируем индексы всех картинок по их классам
+    class_indices = {i: [] for i in range(len(full_dataset.classes))}
+    for idx, target in enumerate(full_dataset.targets):
+        class_indices[target].append(idx)
+
+    # 3. Выбираем по 30 случайных индексов из каждой категории
+    selected_indices = []
+    for indices in class_indices.values():
+        random.shuffle(indices) # Перемешиваем, чтобы фото были случайными
+        selected_indices.extend(indices[:30]) # Берем ровно 30 (или меньше, если в папке их не хватает)
+
+    # 4. Создаем "обрезанный" датасет и передаем его в DataLoader
+    test_dataset = Subset(full_dataset, selected_indices)
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+
+    print(f"📁 Подготовлено для тестирования: {len(test_dataset)} изображений (по 30 на класс).")
     
-    CLASSES = test_dataset.classes
+    CLASSES = test_dataset.dataset.classes
     num_classes = len(CLASSES)
     print(f"📁 Загружено {len(test_dataset)} изображений для тестирования.")
 
